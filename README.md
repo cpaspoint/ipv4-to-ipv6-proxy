@@ -14,7 +14,7 @@ Redirect connections from different ports at one ipv4 address to unique random i
 ## Installation
 [Video tutorial](https://youtu.be/EKBJHSTmT4w), used as Centos setup
 
-1. `bash <(curl -s "https://github.com/cpaspoint/ipv4-to-ipv6-proxy/blob/c9f142d0aefe371e1e071ec5070a57c5c1585fe9/scripts/install.sh")`
+1. `bash <(curl -s "https://github.com/cpaspoint/ipv4-to-ipv6-proxy/raw/main/scripts/install.sh")`
 
 1. After installation dowload the file `proxy.zip`
    * File structure: `IP4:PORT:LOGIN:PASS`
