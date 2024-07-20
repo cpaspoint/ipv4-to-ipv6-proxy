@@ -19,7 +19,7 @@ install_3proxy() {
     echo '#define ANONYMOUS 1' >> ./src/proxy.h
     make -f Makefile.Linux
     mkdir -p /usr/local/etc/3proxy/{bin,logs,stat}
-    cp src/3proxy /usr/local/etc/3proxy/bin/
+    cp src/bin/3proxy /usr/local/etc/3proxy/bin/
     cp ./scripts/rc.d/proxy.sh /etc/init.d/3proxy
     chmod +x /etc/init.d/3proxy
     cd $WORKDIR
