@@ -20,8 +20,7 @@ install_3proxy() {
     ln -s Makefile.Linux Makefile
     make
     mkdir -p /usr/local/etc/3proxy/{bin,logs,stat}
-    pwd
-    cp ./src/bin/3proxy /usr/local/etc/3proxy/bin/3proxy
+    cp bin/3proxy /usr/local/etc/3proxy/bin/3proxy
     cd $WORKDIR
 }
 
@@ -136,6 +135,6 @@ ulimit -n 10048
 service 3proxy start
 EOF
 
-/src/bin/3proxy /usr/local/etc/3proxy/bin/3proxy
+/usr/local/etc/3proxy/bin/3proxy /usr/local/etc/3proxy/3proxy.cfg
 
 gen_proxy_file_for_user
