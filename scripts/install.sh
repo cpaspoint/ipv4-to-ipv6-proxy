@@ -1,22 +1,24 @@
 #!/bin/ksh
+
 random() {
-	tr </dev/urandom -dc A-Za-z0-9 | head -c5
-	echo
+    tr </dev/urandom -dc A-Za-z0-9 | head -c5
+    echo
 }
 
 array=(1 2 3 4 5 6 7 8 9 0 a b c d e f)
 gen64() {
-	ip64() {
-		echo "${array[$RANDOM % 16]}${array[$RANDOM % 16]}${array[$RANDOM % 16]}${array[$RANDOM % 16]}"
-	}
-	echo "$1:$(ip64):$(ip64):$(ip64):$(ip64)"
+    ip64() {
+        echo "${array[RANDOM % 16]}${array[RANDOM % 16]}${array[RANDOM % 16]}${array[RANDOM % 16]}"
+    }
+    echo "$1:$(ip64):$(ip64):$(ip64):$(ip64)"
 }
+
 install_3proxy() {
     echo "installing 3proxy"
     URL="https://github.com/z3APA3A/3proxy/archive/refs/tags/0.8.13.tar.gz"
     ftp -o 3proxy-0.8.13.tar.gz $URL
     tar -xzf 3proxy-0.8.13.tar.gz
-    cd 3proxy-3proxy-0.8.13
+    cd 3proxy-3proxy-0.8.13 || exit
     echo '#define ANONYMOUS 1' >> ./src/proxy.h
     make -f Makefile.BSD
     mkdir -p /usr/local/etc/3proxy/{bin,logs,stat}
@@ -24,7 +26,7 @@ install_3proxy() {
     cp ./scripts/rc.d/proxy.sh /etc/rc.d/3proxy
     chmod +x /etc/rc.d/3proxy
     rcctl enable 3proxy
-    cd $WORKDIR
+    cd $WORKDIR || exit
 }
 
 gen_3proxy() {
@@ -62,17 +64,17 @@ upload_proxy() {
     echo "Proxy is ready! Format IP:PORT:LOGIN:PASS"
     echo "Download zip archive from: ${URL}"
     echo "Password: ${PASS}"
-
 }
+
 gen_data() {
-    seq $FIRST_PORT $LAST_PORT | while read port; do
+    seq $FIRST_PORT $LAST_PORT | while read -r port; do
         echo "usr$(random)/pass$(random)/$IP4/$port/$(gen64 $IP6)"
     done
 }
 
 gen_pf_rules() {
     cat <<EOF
-    $(awk -F "/" '{print "pass in proto tcp from any to any port " $4 " keep state"}' ${WORKDATA})
+$(awk -F "/" '{print "pass in proto tcp from any to any port " $4 " keep state"}' ${WORKDATA})
 EOF
 }
 
@@ -88,7 +90,7 @@ pkg_add -Iv gcc net-tools bsdtar zip curl
 echo "working folder = /home/proxy-installer"
 WORKDIR="/home/proxy-installer"
 WORKDATA="${WORKDIR}/data.txt"
-mkdir -p $WORKDIR && cd $WORKDIR
+mkdir -p $WORKDIR && cd $WORKDIR || exit
 
 IP4=$(curl -4 -s icanhazip.com)
 IP6=$(curl -6 -s icanhazip.com | cut -f1-4 -d':')
@@ -96,10 +98,10 @@ IP6=$(curl -6 -s icanhazip.com | cut -f1-4 -d':')
 echo "Internal ip = ${IP4}. External sub for ip6 = ${IP6}"
 
 echo "How many proxies do you want to create? Example 500"
-read COUNT
+read -r COUNT
 
 FIRST_PORT=10000
-LAST_PORT=$(($FIRST_PORT + $COUNT - 1))
+LAST_PORT=$((FIRST_PORT + COUNT - 1))
 
 gen_data >$WORKDIR/data.txt
 gen_pf_rules >$WORKDIR/boot_pf_rules.pf
