@@ -22,8 +22,7 @@ install_3proxy() {
     make
     mkdir -p /usr/local/etc/3proxy/{bin,logs,stat}
     cp bin/3proxy /usr/local/etc/3proxy/bin/
-    pwd
-    cp scripts/init.d/proxy.sh /etc/init.d/3proxy
+    cp scripts/init.d/3proxy.sh /etc/init.d/3proxy
     chmod +x /etc/init.d/3proxy
     update-rc.d 3proxy defaults
     cd $WORKDIR
@@ -89,8 +88,8 @@ apt update && apt -y install gcc net-tools zip wget curl make iptables >/dev/nul
 
 install_3proxy
 
-echo "working folder = /home/proxy-installer"
-WORKDIR="/home/proxy-installer"
+echo "working folder = /root/proxy-installer"
+WORKDIR="/root/proxy-installer"
 WORKDATA="${WORKDIR}/data.txt"
 mkdir $WORKDIR && cd $_
 
