@@ -1,5 +1,4 @@
-#!/bin/sh
-
+#!/bin/ksh
 random() {
 	tr </dev/urandom -dc A-Za-z0-9 | head -c5
 	echo
@@ -12,15 +11,14 @@ gen64() {
 	}
 	echo "$1:$(ip64):$(ip64):$(ip64):$(ip64)"
 }
-
 install_3proxy() {
     echo "installing 3proxy"
-    URL="https://github.com/z3APA3A/3proxy/archive/3proxy-0.8.6.tar.gz"
-    ftp -o 3proxy.tar.gz $URL
-    tar -xzvf 3proxy.tar.gz
-    cd 3proxy-3proxy-0.8.6
+    URL="https://github.com/z3APA3A/3proxy/archive/refs/tags/0.8.13.tar.gz"
+    ftp -o 3proxy-0.8.13.tar.gz $URL
+    tar -xzf 3proxy-0.8.13.tar.gz
+    cd 3proxy-3proxy-0.8.13
     echo '#define ANONYMOUS 1' >> ./src/proxy.h
-    gmake -f Makefile.Linux
+    make -f Makefile.BSD
     mkdir -p /usr/local/etc/3proxy/{bin,logs,stat}
     cp src/3proxy /usr/local/etc/3proxy/bin/
     cp ./scripts/rc.d/proxy.sh /etc/rc.d/3proxy
@@ -64,8 +62,8 @@ upload_proxy() {
     echo "Proxy is ready! Format IP:PORT:LOGIN:PASS"
     echo "Download zip archive from: ${URL}"
     echo "Password: ${PASS}"
-}
 
+}
 gen_data() {
     seq $FIRST_PORT $LAST_PORT | while read port; do
         echo "usr$(random)/pass$(random)/$IP4/$port/$(gen64 $IP6)"
@@ -74,7 +72,7 @@ gen_data() {
 
 gen_pf_rules() {
     cat <<EOF
-$(awk -F "/" '{print "pass in proto tcp from any to any port " $4 " keep state"}' ${WORKDATA})
+    $(awk -F "/" '{print "pass in proto tcp from any to any port " $4 " keep state"}' ${WORKDATA})
 EOF
 }
 
@@ -85,36 +83,34 @@ EOF
 }
 
 echo "installing apps"
-pkg_add gmake zip
-
-install_3proxy
+pkg_add -Iv gcc net-tools bsdtar zip curl
 
 echo "working folder = /home/proxy-installer"
 WORKDIR="/home/proxy-installer"
 WORKDATA="${WORKDIR}/data.txt"
-mkdir -p $WORKDIR && cd $_
+mkdir -p $WORKDIR && cd $WORKDIR
 
-IP4=$(ifconfig em0 | grep 'inet ' | awk '{print $2}')
-IP6=$(ifconfig em0 | grep 'inet6 ' | grep -v 'fe80' | awk '{print $2}' | cut -f1-4 -d:)
+IP4=$(curl -4 -s icanhazip.com)
+IP6=$(curl -6 -s icanhazip.com | cut -f1-4 -d':')
 
 echo "Internal ip = ${IP4}. External sub for ip6 = ${IP6}"
 
-echo "How many proxy do you want to create? Example 500"
+echo "How many proxies do you want to create? Example 500"
 read COUNT
 
 FIRST_PORT=10000
-LAST_PORT=$(($FIRST_PORT + $COUNT))
+LAST_PORT=$(($FIRST_PORT + $COUNT - 1))
 
 gen_data >$WORKDIR/data.txt
-gen_pf_rules >$WORKDIR/boot_pf.sh
+gen_pf_rules >$WORKDIR/boot_pf_rules.pf
 gen_ifconfig >$WORKDIR/boot_ifconfig.sh
 chmod +x ${WORKDIR}/boot_*.sh
 
 gen_3proxy >/usr/local/etc/3proxy/3proxy.cfg
 
 cat >>/etc/rc.local <<EOF
-sh ${WORKDIR}/boot_pf.sh
 sh ${WORKDIR}/boot_ifconfig.sh
+pfctl -f ${WORKDIR}/boot_pf_rules.pf
 ulimit -n 10048
 rcctl start 3proxy
 EOF
