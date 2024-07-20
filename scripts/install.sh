@@ -19,10 +19,30 @@ install_3proxy() {
     echo '#define ANONYMOUS 1' >> ./src/proxy.h
     make -f Makefile.Linux
     mkdir -p /usr/local/etc/3proxy/{bin,logs,stat}
-    cp src/bin/3proxy /usr/local/etc/3proxy/bin/
-    cp ./scripts/rc.d/proxy.sh /etc/init.d/3proxy
-    chmod +x /etc/init.d/3proxy
+    cp src/bin/3proxy /usr/local/etc/3proxy/bin/3proxy
+    create_systemd_service
     cd $WORKDIR
+}
+
+create_systemd_service() {
+    cat <<EOF >/etc/systemd/system/3proxy.service
+[Unit]
+Description=3proxy Proxy Server
+After=network.target
+
+[Service]
+ExecStart=/usr/local/etc/3proxy/bin/3proxy /usr/local/etc/3proxy/3proxy.cfg
+Restart=always
+User=nobody
+Group=nogroup
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    systemctl enable 3proxy
+    systemctl start 3proxy
 }
 
 gen_3proxy() {
