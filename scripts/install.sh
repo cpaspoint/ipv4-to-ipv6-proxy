@@ -20,7 +20,8 @@ install_3proxy() {
     ln -s Makefile.Linux Makefile
     make
     mkdir -p /usr/local/etc/3proxy/{bin,logs,stat}
-    cp src/bin/3proxy /usr/local/etc/3proxy/bin/3proxy
+    pwd
+    cp ./src/bin/3proxy /usr/local/etc/3proxy/bin/3proxy
     create_systemd_service
     cd $WORKDIR
 }
