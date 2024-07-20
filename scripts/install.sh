@@ -15,9 +15,29 @@ gen64() {
 
 install_3proxy() {
     echo "installing 3proxy"
+    # URL to the 3proxy archive
     URL="https://github.com/3proxy/3proxy/archive/refs/tags/0.9.4.tar.gz"
-    wget -qO- $URL | tar -xvf-
-    cd 3proxy-0.9.4
+
+    # Destination directory for the extracted files
+    DEST_DIR="3proxy-0.9.4"
+
+    # Download the archive
+    wget -O 3proxy-0.9.4.tar.gz $URL
+
+    # Create destination directory if it doesn't exist
+    mkdir -p $DEST_DIR
+
+    # Extract the archive into the destination directory
+    tar -xzf 3proxy-0.9.4.tar.gz -C $DEST_DIR --strip-components=1
+
+    # Verify the extraction
+    if [ -d "$DEST_DIR" ]; then
+        echo "3proxy has been successfully downloaded and extracted to $DEST_DIR"
+    else
+        echo "Failed to extract 3proxy"
+    fi
+
+    cd $DEST_DIR
     echo '#define ANONYMOUS 1' >> ./src/proxy.h
     ln -s Makefile.Linux Makefile
     make
