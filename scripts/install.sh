@@ -17,7 +17,8 @@ install_3proxy() {
     wget -qO- $URL | bsdtar -xvf-
     cd 3proxy-0.9.4
     echo '#define ANONYMOUS 1' >> ./src/proxy.h
-    make -f Makefile.Linux
+    ln -s Makefile.Linux Makefile
+    make
     mkdir -p /usr/local/etc/3proxy/{bin,logs,stat}
     cp src/bin/3proxy /usr/local/etc/3proxy/bin/3proxy
     create_systemd_service
