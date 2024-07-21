@@ -60,9 +60,7 @@ EOF
 
 # Function to generate a proxy file listing for users
 generate_proxy_list() {
-    cat >proxy.txt <<EOF
-$(awk -F "/" '{print $3 ":" $4 ":" $1 ":" $2 }' ${WORKDATA})
-EOF
+    awk -F "/" '{print $3 ":" $4 ":" $1 ":" $2 }' "$WORKDATA" > proxy.txt
 }
 
 # Function to generate proxy data entries
