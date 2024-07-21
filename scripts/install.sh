@@ -1,11 +1,11 @@
-#!/bin/bash
-
+#!/bin/sh
 random() {
     tr </dev/urandom -dc A-Za-z0-9 | head -c5
     echo
 }
 
 array=(1 2 3 4 5 6 7 8 9 0 a b c d e f)
+
 gen64() {
     ip64() {
         echo "${array[$RANDOM % 16]}${array[$RANDOM % 16]}${array[$RANDOM % 16]}${array[$RANDOM % 16]}"
@@ -14,17 +14,31 @@ gen64() {
 }
 
 install_3proxy() {
-    echo "installing 3proxy"
-    git clone https://github.com/z3apa3a/3proxy
-    cd 3proxy
+    echo "Installing 3proxy"
+    URL="https://github.com/z3APA3A/3proxy/archive/refs/tags/0.8.13.tar.gz"
+    wget -qO- $URL | tar -xzf-
+    cd 3proxy-0.8.13
     echo '#define ANONYMOUS 1' >> ./src/proxy.h
-    ln -s Makefile.Linux Makefile
-    make
+    make -f Makefile.Linux
     mkdir -p /usr/local/etc/3proxy/{bin,logs,stat}
-    cp bin/3proxy /usr/local/etc/3proxy/bin/
-    cp scripts/init.d/3proxy.sh /etc/init.d/3proxy
-    chmod +x /etc/init.d/3proxy
-    update-rc.d 3proxy defaults
+    cp src/3proxy /usr/local/etc/3proxy/bin/
+    cat <<EOF >/usr/lib/systemd/system/3proxy.service
+[Unit]
+Description=3Proxy Proxy Server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/etc/3proxy/bin/3proxy /usr/local/etc/3proxy/3proxy.cfg
+ExecReload=/bin/kill -HUP \$MAINPID
+ExecStop=/bin/kill -TERM \$MAINPID
+Restart=on-failure
+User=nobody
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl enable 3proxy
     cd $WORKDIR
 }
 
@@ -73,30 +87,30 @@ gen_data() {
 
 gen_iptables() {
     cat <<EOF
-$(awk -F "/" '{print "iptables -I INPUT -p tcp --dport " $4 "  -m state --state NEW -j ACCEPT"}' ${WORKDATA}) 
+$(awk -F "/" '{print "iptables -I INPUT -p tcp --dport " $4 " -m state --state NEW -j ACCEPT"}' ${WORKDATA}) 
 EOF
 }
 
 gen_ifconfig() {
     cat <<EOF
-$(awk -F "/" '{print "ip -6 addr add " $5 "/64 dev enp1s0"}' ${WORKDATA})
+$(awk -F "/" '{print "ip -6 addr add " $5 "/64 dev eth0"}' ${WORKDATA})
 EOF
 }
 
-echo "installing apps"
-apt update && apt -y install gcc net-tools zip wget curl make iptables iproute2 >/dev/null
+echo "Installing necessary packages"
+dnf -y install gcc make tar wget net-tools zip curl >/dev/null
 
 install_3proxy
 
-echo "working folder = /root/proxy-installer"
-WORKDIR="/root/proxy-installer"
+echo "Working folder = /home/proxy-installer"
+WORKDIR="/home/proxy-installer"
 WORKDATA="${WORKDIR}/data.txt"
 mkdir $WORKDIR && cd $_
 
 IP4=$(curl -4 -s icanhazip.com)
 IP6=$(curl -6 -s icanhazip.com | cut -f1-4 -d':')
 
-echo "Internal IP = ${IP4}. External sub for IP6 = ${IP6}"
+echo "Internal IP = ${IP4}. External sub for IPv6 = ${IP6}"
 
 echo "How many proxies do you want to create? Example 500"
 read COUNT
@@ -107,21 +121,17 @@ LAST_PORT=$(($FIRST_PORT + $COUNT))
 gen_data >$WORKDIR/data.txt
 gen_iptables >$WORKDIR/boot_iptables.sh
 gen_ifconfig >$WORKDIR/boot_ifconfig.sh
-chmod +x ${WORKDIR}/boot_*.sh
+chmod +x ${WORKDIR}/boot_*.sh /etc/rc.d/rc.local
 
 gen_3proxy >/usr/local/etc/3proxy/3proxy.cfg
 
-cat <<EOF | tee -a /etc/rc.local
-#!/bin/bash
+cat >>/etc/rc.d/rc.local <<EOF
 bash ${WORKDIR}/boot_iptables.sh
 bash ${WORKDIR}/boot_ifconfig.sh
 ulimit -n 10048
-service 3proxy start
 EOF
 
-chmod +x /etc/rc.local
-
-bash /etc/rc.local
+systemctl start 3proxy
 
 gen_proxy_file_for_user
 
