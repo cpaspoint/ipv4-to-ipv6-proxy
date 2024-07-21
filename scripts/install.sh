@@ -79,12 +79,12 @@ EOF
 
 gen_ifconfig() {
     cat <<EOF
-$(awk -F "/" '{print "ifconfig enp1s0 inet6 add " $5 "/64"}' ${WORKDATA})
+$(awk -F "/" '{print "ip -6 addr add " $5 "/64 dev enp1s0"}' ${WORKDATA})
 EOF
 }
 
 echo "installing apps"
-apt update && apt -y install gcc net-tools zip wget curl make iptables >/dev/null
+apt update && apt -y install gcc net-tools zip wget curl make iptables iproute2 >/dev/null
 
 install_3proxy
 
