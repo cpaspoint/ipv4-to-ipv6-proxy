@@ -33,10 +33,7 @@ install_and_configure_3proxy() {
   ln -s Makefile.Linux Makefile
   make
   mkdir -p /usr/local/etc/3proxy/{bin,logs,stat}
-  cp src/3proxy /usr/local/etc/3proxy/bin/
-  cp ./scripts/rc.d/proxy.sh /etc/systemd/system/3proxy.service
-  chmod +x /etc/systemd/system/3proxy.service
-  systemctl enable 3proxy
+  cp bin/3proxy /usr/local/etc/3proxy/bin/
   cd "$WORKDIR"
 }
 
@@ -66,18 +63,6 @@ generate_proxy_list() {
     awk -F "/" '{print $3 ":" $4 ":" $1 ":" $2 }' "$WORKDATA" > proxy.txt
 }
 
-# Function to upload the proxy file and provide download details
-upload_proxy_file() {
-    local password=$(generate_random_string)
-    zip --password "$password" proxy.zip proxy.txt || { echo "Failed to create zip file"; exit 1; }
-    local upload_url=$(curl -s --upload-file proxy.zip https://transfer.sh/proxy.zip)
-
-    cat /home/proxy-installer/proxy.txt
-    echo "Proxy is ready! Format: IP:PORT:LOGIN:PASS"
-    echo "Download zip archive from: ${upload_url}"
-    echo "Password: ${password}"
-}
-
 # Function to generate proxy data entries
 create_proxy_data() {
     seq "$FIRST_PORT" "$LAST_PORT" | while read -r port; do
@@ -97,53 +82,47 @@ create_ifconfig_commands() {
 
 # Main script execution
 main() {
-    echo "Installing required applications..."
-    dnf -y install gcc net-tools bsdtar zip iptables-services >/dev/null || { echo "Package installation failed"; exit 1; }
+  echo "Installing required applications..."
+  dnf -y install gcc net-tools bsdtar zip iptables-services >/dev/null || { echo "Package installation failed"; exit 1; }
 
-    echo "Setting up working directory..."
-    WORKDIR="/home/proxy-installer"
-    WORKDATA="${WORKDIR}/data.txt"
-    mkdir -p "$WORKDIR" || { echo "Failed to create working directory"; exit 1; }
-    cd "$WORKDIR" || { echo "Failed to change directory"; exit 1; }
+  echo "Setting up working directory..."
+  WORKDIR="/home/proxy-installer"
+  WORKDATA="${WORKDIR}/data.txt"
+  mkdir -p "$WORKDIR" || { echo "Failed to create working directory"; exit 1; }
 
-    IP4=$(curl -4 -s icanhazip.com)
-    IP6=$(curl -6 -s icanhazip.com | cut -f1-4 -d':')
+  IP4=$(curl -4 -s icanhazip.com)
+  IP6=$(curl -6 -s icanhazip.com | cut -f1-4 -d':')
 
-    echo "Internal IP: ${IP4}. External IPv6 subnet: ${IP6}"
+  echo "Internal IP: ${IP4}. External IPv6 subnet: ${IP6}"
 
-    echo "Enter the number of proxies to create (e.g., 500):"
-    read -r COUNT
+  echo "Enter the number of proxies to create (e.g., 500):"
+  read -r COUNT
 
-    FIRST_PORT=10000
-    LAST_PORT=$((FIRST_PORT + COUNT - 1))
+  FIRST_PORT=10000
+  LAST_PORT=$((FIRST_PORT + COUNT - 1))
 
-    create_proxy_data > "$WORKDATA"
-    create_iptables_rules > "$WORKDIR/boot_iptables.sh"
-    create_ifconfig_commands > "$WORKDIR/boot_ifconfig.sh"
-    chmod +x "$WORKDIR/boot_*.sh"
+  create_proxy_data > "$WORKDATA"
+  create_iptables_rules > "$WORKDIR/boot_iptables.sh"
+  create_ifconfig_commands > "$WORKDIR/boot_ifconfig.sh"
+  chmod +x "$WORKDIR/boot_*.sh"
 
-    install_and_configure_3proxy
-    create_3proxy_config > /usr/local/etc/3proxy/3proxy.cfg
+  install_and_configure_3proxy
+  create_3proxy_config > /usr/local/etc/3proxy/3proxy.cfg
 
-    # Configure rc.local for startup commands
-    if [ ! -f /etc/rc.d/rc.local ]; then
-        touch /etc/rc.d/rc.local
-        chmod +x /etc/rc.d/rc.local
-    fi
+  # Configure rc.local for startup commands
+  if [ ! -f /etc/rc.d/rc.local ]; then
+    touch /etc/rc.d/rc.local
+    chmod +x /etc/rc.d/rc.local
+  fi
 
-    cat >> /etc/rc.d/rc.local <<EOF
-#!/bin/bash
-bash ${WORKDIR}/boot_iptables.sh
-bash ${WORKDIR}/boot_ifconfig.sh
-ulimit -n 10048
-systemctl start 3proxy
-EOF
+    
+  bash ${WORKDIR}/boot_iptables.sh
+  bash ${WORKDIR}/boot_ifconfig.sh
+  sudo systemctl stop firewalld
+  sudo systemctl disable firewalld
+  /usr/local/etc/3proxy/bin/3proxy /usr/local/etc/3proxy/3proxy.cfg
 
-    # Execute rc.local
-    /etc/rc.d/rc.local || { echo "Failed to execute rc.local"; exit 1; }
-
-    generate_proxy_list
-    upload_proxy_file
+  generate_proxy_list
 }
 
 main
