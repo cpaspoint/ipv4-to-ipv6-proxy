@@ -60,7 +60,9 @@ EOF
 
 # Function to generate a proxy file listing for users
 generate_proxy_list() {
-    awk -F "/" '{print $3 ":" $4 ":" $1 ":" $2 }' "$WORKDATA" > proxy.txt
+    cat >proxy.txt <<EOF
+$(awk -F "/" '{print $3 ":" $4 ":" $1 ":" $2 }' ${WORKDATA})
+EOF
 }
 
 # Function to generate proxy data entries
@@ -109,20 +111,15 @@ main() {
   install_and_configure_3proxy
   create_3proxy_config > /usr/local/etc/3proxy/3proxy.cfg
 
-  # Configure rc.local for startup commands
-  if [ ! -f /etc/rc.d/rc.local ]; then
-    touch /etc/rc.d/rc.local
-    chmod +x /etc/rc.d/rc.local
-  fi
-
-    
   bash ${WORKDIR}/boot_iptables.sh
   bash ${WORKDIR}/boot_ifconfig.sh
   sudo systemctl stop firewalld
   sudo systemctl disable firewalld
+  ulimit -n 20096
   /usr/local/etc/3proxy/bin/3proxy /usr/local/etc/3proxy/3proxy.cfg
 
   generate_proxy_list
+  cat /home/proxy-installer/proxy.txt
 }
 
 main
