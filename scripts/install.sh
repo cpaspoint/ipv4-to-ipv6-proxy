@@ -33,7 +33,8 @@ install_and_configure_3proxy() {
   ln -s Makefile.Linux Makefile
   make
   mkdir -p /usr/local/etc/3proxy/{bin,logs,stat}
-  cp bin/3proxy /usr/local/etc/3proxy/bin/
+  cp src/3proxy /usr/local/etc/3proxy/bin/
+  cd "$WORKDIR"
 }
 
 # Function to generate the 3proxy configuration file
@@ -84,8 +85,6 @@ main() {
   echo "Installing required applications..."
   dnf -y install gcc net-tools bsdtar zip iptables-services >/dev/null || { echo "Package installation failed"; exit 1; }
 
-  install_and_configure_3proxy
-  
   echo "Setting up working directory..."
   WORKDIR="/home/proxy-installer"
   WORKDATA="${WORKDIR}/data.txt"
@@ -102,18 +101,18 @@ main() {
   FIRST_PORT=10000
   LAST_PORT=$((FIRST_PORT + COUNT - 1))
 
-  create_3proxy_config > /usr/local/etc/3proxy/3proxy.cfg
-  
   create_proxy_data > "$WORKDATA"
   create_iptables_rules > "$WORKDIR/boot_iptables.sh"
   create_ifconfig_commands > "$WORKDIR/boot_ifconfig.sh"
   chmod +x "$WORKDIR/boot_*.sh"
 
+  install_and_configure_3proxy
+  create_3proxy_config > /usr/local/etc/3proxy/3proxy.cfg
+    
   bash ${WORKDIR}/boot_iptables.sh
   bash ${WORKDIR}/boot_ifconfig.sh
   sudo systemctl stop firewalld
   sudo systemctl disable firewalld
-  ulimit -n 20096
   /usr/local/etc/3proxy/bin/3proxy /usr/local/etc/3proxy/3proxy.cfg
 
   generate_proxy_list
