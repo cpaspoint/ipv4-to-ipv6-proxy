@@ -33,7 +33,7 @@ install_and_configure_3proxy() {
   ln -s Makefile.Linux Makefile
   make
   mkdir -p /usr/local/etc/3proxy/{bin,logs,stat}
-  cp src/3proxy /usr/local/etc/3proxy/bin/
+  cp bin/3proxy /usr/local/etc/3proxy/bin/
   cd "$WORKDIR"
 }
 
@@ -116,6 +116,7 @@ main() {
   /usr/local/etc/3proxy/bin/3proxy /usr/local/etc/3proxy/3proxy.cfg
 
   generate_proxy_list
+  cat /home/proxy-installer/proxy.txt
 }
 
 main
