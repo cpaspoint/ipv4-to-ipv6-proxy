@@ -15,7 +15,7 @@ install_3proxy() {
     echo "installing 3proxy"
     URL="https://raw.githubusercontent.com/cpaspoint/ipv4-to-ipv6-proxy/master/3proxy-0.9.5.tar.gz"
     wget -qO- $URL | bsdtar -xvf-
-    cd 3proxy-3proxy-0.9.5
+    cd 3proxy-0.9.5
     echo '#define ANONYMOUS 1' >> ./src/proxy.h
     make -f Makefile.Linux
     mkdir -p /usr/local/etc/3proxy/{bin,logs,stat}
