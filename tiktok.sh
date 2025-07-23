@@ -1,22 +1,22 @@
 #!/bin/sh
 random() {
-	tr </dev/urandom -dc A-Za-z0-9 | head -c5
-	echo
+    tr </dev/urandom -dc A-Za-z0-9 | head -c5
+    echo
 }
 
 array=(1 2 3 4 5 6 7 8 9 0 a b c d e f)
 gen64() {
-	ip64() {
-		echo "${array[$RANDOM % 16]}${array[$RANDOM % 16]}${array[$RANDOM % 16]}${array[$RANDOM % 16]}"
-	}
-	echo "$1:$(ip64):$(ip64):$(ip64):$(ip64)"
+    ip64() {
+        echo "${array[$RANDOM % 16]}${array[$RANDOM % 16]}${array[$RANDOM % 16]}${array[$RANDOM % 16]}"
+    }
+    echo "$1:$(ip64):$(ip64):$(ip64):$(ip64)"
 }
+
 install_3proxy() {
     echo "installing 3proxy"
-    URL="https://github.com/z3APA3A/3proxy/archive/3proxy-0.8.6.tar.gz"
+    URL="https://github.com/z3APA3A/3proxy/archive/refs/tags/0.9.4.tar.gz"
     wget -qO- $URL | bsdtar -xvf-
-    cd 3proxy-3proxy-0.8.6
-    echo '#define ANONYMOUS 1' >> ./src/proxy.h
+    cd 3proxy-0.9.4
     make -f Makefile.Linux
     mkdir -p /usr/local/etc/3proxy/{bin,logs,stat}
     cp src/3proxy /usr/local/etc/3proxy/bin/
@@ -42,14 +42,14 @@ users $(awk -F "/" 'BEGIN{ORS="";} {print $1 ":CL:" $2 " "}' ${WORKDATA})
 $(awk -F "/" '{print "auth strong\n" \
 "allow " $1 "\n" \
 "proxy -6 -n -a -p" $4 " -i" $3 " -e"$5"\n" \
-"socks -6 -n -a -p" $4 " -i" $3 " -e"$5"\n" \  # THIS IS THE ONLY LINE ADDED
+"socks -6 -n -a -p" $4 " -i" $3 " -e"$5"\n" \
 "flush\n"}' ${WORKDATA})
 EOF
 }
 
 gen_proxy_file_for_user() {
     cat >proxy.txt <<EOF
-$(awk -F "/" '{print "socks5://" $1 ":" $2 "@" $3 ":" $4}' ${WORKDATA})  # CHANGED TO SOCKS5 FORMAT
+$(awk -F "/" '{print "socks5://" $1 ":" $2 "@" $3 ":" $4}' ${WORKDATA})
 EOF
 }
 
@@ -58,8 +58,7 @@ upload_proxy() {
     zip --password $PASS proxy.zip proxy.txt
     URL=$(curl -s --upload-file proxy.zip https://transfer.sh/proxy.zip)
 
-    cat proxy.txt  # CHANGED FROM /home/proxy-installer/proxy.txt TO RELATIVE PATH
-    echo "Proxy is ready! Format: socks5://USER:PASS@IP:PORT"  # UPDATED FORMAT NOTICE
+    echo "Proxy is ready! Format: socks5://USER:PASS@IP:PORT"
     echo "Download zip archive from: ${URL}"
     echo "Password: ${PASS}"
 }
@@ -72,20 +71,22 @@ gen_data() {
 
 gen_iptables() {
     cat <<EOF
-    $(awk -F "/" '{print "iptables -I INPUT -p tcp --dport " $4 "  -m state --state NEW -j ACCEPT"}' ${WORKDATA}) 
+$(awk -F "/" '{print "iptables -I INPUT -p tcp --dport " $4 "  -m state --state NEW -j ACCEPT"}' ${WORKDATA}) 
 EOF
 }
 
 gen_ifconfig() {
+    # Get the main network interface
+    MAIN_IF=$(ip route | grep default | awk '{print $5}' | head -n1)
+    [ -z "$MAIN_IF" ] && MAIN_IF="eth0"
+    
     cat <<EOF
-$(awk -F "/" '{print "ifconfig eth0 inet6 add " $5 "/64"}' ${WORKDATA})
+$(awk -F "/" '{print "ip -6 addr add " $5 "/64 dev '"$MAIN_IF"'"}' ${WORKDATA})
 EOF
 }
 
 echo "installing apps"
 yum -y install gcc net-tools bsdtar zip >/dev/null
-
-install_3proxy
 
 echo "working folder = /home/proxy-installer"
 WORKDIR="/home/proxy-installer"
@@ -93,9 +94,9 @@ WORKDATA="${WORKDIR}/data.txt"
 mkdir -p $WORKDIR && cd $_
 
 IP4=$(curl -4 -s icanhazip.com)
-IP6=$(curl -6 -s icanhazip.com | cut -f1-4 -d':')
+IP6=$(curl -6 -s icanhazip.com 2>/dev/null | cut -f1-4 -d':')
 
-echo "Internal ip = ${IP4}. Exteranl sub for ip6 = ${IP6}"
+echo "Internal ip = ${IP4}. External sub for ip6 = ${IP6}"
 
 echo "How many proxy do you want to create? Example 500"
 read COUNT
@@ -121,4 +122,4 @@ bash /etc/rc.local
 
 gen_proxy_file_for_user
 
-upload_proxy
+#upload_proxy
