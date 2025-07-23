@@ -13,7 +13,7 @@ gen64() {
 }
 install_3proxy() {
     echo "installing 3proxy"
-    URL="https://github.com/z3APA3A/3proxy/archive/3proxy-0.9.5.tar.gz"
+    URL="https://raw.githubusercontent.com/cpaspoint/ipv4-to-ipv6-proxy/master/3proxy-0.9.5.tar.gz"
     wget -qO- $URL | bsdtar -xvf-
     cd 3proxy-3proxy-0.9.5
     echo '#define ANONYMOUS 1' >> ./src/proxy.h
