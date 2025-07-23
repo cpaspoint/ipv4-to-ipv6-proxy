@@ -1,31 +1,52 @@
 #!/bin/sh
+
+# Function to generate random strings
 random() {
   tr </dev/urandom -dc A-Za-z0-9 | head -c5
   echo
 }
 
+# Array for IPv6 generation
 array=(1 2 3 4 5 6 7 8 9 0 a b c d e f)
+
+# Function to generate IPv6 addresses
 gen64() {
   ip64() {
     echo "${array[$RANDOM % 16]}${array[$RANDOM % 16]}${array[$RANDOM % 16]}${array[$RANDOM % 16]}"
   }
   echo "$1:$(ip64):$(ip64):$(ip64):$(ip64)"
 }
+
+# Function to install 3proxy from source
 install_3proxy() {
-    echo "installing 3proxy"
-    URL="https://raw.githubusercontent.com/cpaspoint/ipv4-to-ipv6-proxy/master/3proxy-0.9.5.tar.gz"
-    wget -qO- $URL | bsdtar -xvf-
-    cd 3proxy-0.9.5
+    echo "Installing dependencies..."
+    yum -y install gcc make git libbsd bsdtar zip >/dev/null
+
+    echo "Cloning and building 3proxy..."
+    git clone https://github.com/z3APA3A/3proxy
+    cd 3proxy
+    
+    # Apply anonymous patch
     echo '#define ANONYMOUS 1' >> ./src/proxy.h
+    
+    # Build and install
     make -f Makefile.Linux
+    if [ $? -ne 0 ]; then
+        echo "3proxy compilation failed!"
+        exit 1
+    fi
+    
     mkdir -p /usr/local/etc/3proxy/{bin,logs,stat}
     cp src/3proxy /usr/local/etc/3proxy/bin/
-    cp ./scripts/rc.d/proxy.sh /etc/init.d/3proxy
+    cp scripts/rc.d/proxy.sh /etc/init.d/3proxy
     chmod +x /etc/init.d/3proxy
     chkconfig 3proxy on
-    cd $WORKDIR
+    
+    cd ..
+    echo "3proxy installed successfully"
 }
 
+# Function to generate 3proxy config
 gen_3proxy() {
     cat <<EOF
 daemon
@@ -47,6 +68,7 @@ $(awk -F "/" '{print "auth strong\n" \
 EOF
 }
 
+# Function to generate proxy list files
 gen_proxy_file_for_user() {
     cat >proxy.txt <<EOF
 $(awk -F "/" '{print $3 ":" $4 ":" $1 ":" $2 }' ${WORKDATA})
@@ -59,72 +81,103 @@ $(awk -F "/" '{print "socks5://" $1 ":" $2 "@" $3 ":" $4}' ${WORKDATA})
 EOF
 }
 
+# Function to upload proxy list
 upload_proxy() {
     local PASS=$(random)
     zip --password $PASS proxy.zip proxy.txt
     URL=$(curl -s --upload-file proxy.zip https://transfer.sh/proxy.zip)
 
-    cat /home/proxy-installer/proxy.txt
     echo "Proxy is ready! Format IP:PORT:LOGIN:PASS"
     echo "Download zip archive from: ${URL}"
     echo "Password: ${PASS}"
-
 }
+
+# Function to generate proxy data
 gen_data() {
     seq $FIRST_PORT $LAST_PORT | while read port; do
         echo "usr$(random)/pass$(random)/$IP4/$port/$(gen64 $IP6)"
     done
 }
 
+# Function to generate iptables rules
 gen_iptables() {
     cat <<EOF
-    $(awk -F "/" '{print "iptables -I INPUT -p tcp --dport " $4 "  -m state --state NEW -j ACCEPT"}' ${WORKDATA})
+$(awk -F "/" '{print "iptables -I INPUT -p tcp --dport " $4 "  -m state --state NEW -j ACCEPT"}' ${WORKDATA})
 EOF
 }
 
+# Function to generate ifconfig commands
 gen_ifconfig() {
+    # Detect main network interface
+    INTERFACE=$(ip route | awk '/default/ {print $5}')
     cat <<EOF
-$(awk -F "/" '{print "ifconfig eth0 inet6 add " $5 "/64"}' ${WORKDATA})
+$(awk -F "/" '{print "ifconfig $INTERFACE inet6 add " $5 "/64"}' ${WORKDATA})
 EOF
 }
-echo "installing apps"
-yum -y install gcc net-tools bsdtar zip >/dev/null
 
-install_3proxy
+### Main Script Execution ###
 
-echo "working folder = /home/proxy-installer"
+echo "Starting proxy installation..."
+
+# Create working directory
+echo "Setting up working directory..."
 WORKDIR="/home/proxy-installer"
 WORKDATA="${WORKDIR}/data.txt"
-mkdir $WORKDIR && cd $_
+mkdir -p $WORKDIR && cd $WORKDIR
 
+# Get IP addresses
 IP4=$(curl -4 -s icanhazip.com)
 IP6=$(curl -6 -s icanhazip.com | cut -f1-4 -d':')
 
-echo "Internal ip = ${IP4}. Exteranl sub for ip6 = ${IP6}"
+echo "Internal IPv4 = ${IP4}"
+echo "External IPv6 prefix = ${IP6}"
 
-echo "How many proxy do you want to create? Example 500"
+# Get proxy count
+echo "How many proxies do you want to create? (e.g., 500)"
 read COUNT
-
 FIRST_PORT=10000
 LAST_PORT=$(($FIRST_PORT + $COUNT))
 
-gen_data >$WORKDIR/data.txt
+# Generate data
+echo "Generating proxy data..."
+gen_data >$WORKDATA
+
+# Generate config files
+echo "Generating configuration files..."
 gen_iptables >$WORKDIR/boot_iptables.sh
 gen_ifconfig >$WORKDIR/boot_ifconfig.sh
-chmod +x ${WORKDIR}/boot_*.sh /etc/rc.local
+chmod +x ${WORKDIR}/boot_*.sh
 
+# Install 3proxy
+install_3proxy
+
+# Generate 3proxy config
 gen_3proxy >/usr/local/etc/3proxy/3proxy.cfg
 
+# Set up rc.local
+echo "Setting up startup configuration..."
 cat >>/etc/rc.local <<EOF
+#!/bin/bash
 bash ${WORKDIR}/boot_iptables.sh
 bash ${WORKDIR}/boot_ifconfig.sh
 ulimit -n 10048
 service 3proxy start
+exit 0
 EOF
+chmod +x /etc/rc.local
 
+# Start services
+echo "Starting services..."
 bash /etc/rc.local
 
+# Generate proxy list files
+echo "Generating proxy list files..."
 gen_proxy_file_for_user
 gen_proxy_file_for_user2
 
-#upload_proxy
+# Upload proxy list (optional)
+# upload_proxy
+
+echo "Installation complete!"
+echo "Proxy list generated in $WORKDIR/proxy.txt"
+echo "You can find both IP:PORT:LOGIN:PASS and socks5:// formats"
