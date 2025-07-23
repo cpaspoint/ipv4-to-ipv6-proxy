@@ -19,28 +19,62 @@ gen64() {
 
 # Function to install 3proxy from source
 install_3proxy() {
+    echo "Checking for existing 3proxy installation..."
+    
+    # Check if 3proxy is already installed and running
+    if [ -f /usr/local/etc/3proxy/bin/3proxy ]; then
+        echo "3proxy is already installed at /usr/local/etc/3proxy/bin/3proxy"
+        echo "Do you want to reinstall? [y/N]"
+        read REINSTALL
+        if [ "$REINSTALL" != "y" ] && [ "$REINSTALL" != "Y" ]; then
+            return 0
+        fi
+        echo "Removing previous installation..."
+        rm -rf /usr/local/etc/3proxy
+        pkill 3proxy
+    fi
+
     echo "Installing dependencies..."
     yum -y install gcc make git libbsd bsdtar zip >/dev/null
 
-    echo "Cloning and building 3proxy..."
-    git clone https://github.com/z3APA3A/3proxy
+    echo "Preparing 3proxy source..."
+    if [ -d "3proxy" ]; then
+        echo "Found existing 3proxy directory, cleaning up..."
+        rm -rf 3proxy
+    fi
+
+    echo "Cloning fresh 3proxy source..."
+    git clone https://github.com/z3APA3A/3proxy || {
+        echo "Failed to clone 3proxy repository!"
+        exit 1
+    }
+
     cd 3proxy
     
     # Apply anonymous patch
     echo '#define ANONYMOUS 1' >> ./src/proxy.h
     
-    # Build and install
-    make -f Makefile.Linux
-    if [ $? -ne 0 ]; then
+    echo "Compiling 3proxy..."
+    make -f Makefile.Linux || {
         echo "3proxy compilation failed!"
         exit 1
-    fi
+    }
     
+    echo "Installing 3proxy..."
     mkdir -p /usr/local/etc/3proxy/{bin,logs,stat}
-    cp src/3proxy /usr/local/etc/3proxy/bin/
-    cp scripts/rc.d/proxy.sh /etc/init.d/3proxy
-    chmod +x /etc/init.d/3proxy
-    chkconfig 3proxy on
+    cp src/3proxy /usr/local/etc/3proxy/bin/ || {
+        echo "Failed to copy 3proxy binary!"
+        exit 1
+    }
+    
+    if [ -f "./scripts/rc.d/proxy.sh" ]; then
+        cp ./scripts/rc.d/proxy.sh /etc/init.d/3proxy
+        chmod +x /etc/init.d/3proxy
+        chkconfig 3proxy on
+    else
+        echo "Warning: Could not find init script at ./scripts/rc.d/proxy.sh"
+        echo "You may need to set up service management manually"
+    fi
     
     cd ..
     echo "3proxy installed successfully"
