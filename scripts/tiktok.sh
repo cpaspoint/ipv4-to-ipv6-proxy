@@ -19,72 +19,57 @@ gen64() {
   echo "$1:$(ip64):$(ip64):$(ip64):$(ip64)"
 }
 
-# Enhanced installation function with proper cleanup
+# Fixed 3proxy installer with correct binary path handling
+
+# Function to locate the compiled binary
+find_3proxy_binary() {
+    # Check possible locations
+    [ -f "src/3proxy" ] && echo "src/3proxy" && return
+    [ -f "bin/3proxy" ] && echo "bin/3proxy" && return
+    [ -f "3proxy" ] && echo "3proxy" && return
+    echo ""
+}
+
 install_3proxy() {
-    echo "Checking for existing 3proxy installation..."
+    echo -e "\n[2/6] COMPILING AND INSTALLING 3PROXY..."
     
-    # Clean up any previous installation attempts
-    if [ -d "3proxy" ]; then
-        echo "Found previous 3proxy source directory, cleaning up..."
-        rm -rf 3proxy
-    fi
-    
-    # Check if 3proxy is already installed
-    if [ -f /usr/local/etc/3proxy/bin/3proxy ]; then
-        echo "3proxy binary already exists at /usr/local/etc/3proxy/bin/3proxy"
-        echo "Do you want to perform a fresh installation? [y/N]"
-        read REINSTALL
-        if [ "$REINSTALL" != "y" ] && [ "$REINSTALL" != "Y" ]; then
-            echo "Using existing 3proxy installation"
-            return 0
-        fi
-        echo "Removing previous installation..."
-        rm -rf /usr/local/etc/3proxy
-        pkill -9 3proxy || true
-    fi
-
-    echo "Installing dependencies..."
-    yum -y install gcc make git libbsd bsdtar zip >/dev/null || {
-        echo "Failed to install dependencies!"
+    rm -rf 3proxy
+    git clone https://github.com/z3APA3A/3proxy.git || {
+        echo "ERROR: Failed to clone repository"
         exit 1
     }
-
-    echo "Cloning 3proxy source..."
-    git clone https://github.com/z3APA3A/3proxy || {
-        echo "Failed to clone 3proxy repository!"
-        exit 1
-    }
-
+    
     cd 3proxy
-    
-    echo "Applying anonymous patch..."
     echo '#define ANONYMOUS 1' >> ./src/proxy.h
     
-    echo "Compiling 3proxy..."
-    make -f Makefile.Linux || {
-        echo "3proxy compilation failed!"
+    # Compile with verbose output
+    echo "Compiling 3proxy (this may take a few minutes)..."
+    make -f Makefile.Linux | tee -a /tmp/proxy_install.log || {
+        echo "ERROR: Compilation failed"
         exit 1
     }
     
-    echo "Installing 3proxy..."
-    mkdir -p /usr/local/etc/3proxy/{bin,logs,stat}
-    cp src/3proxy /usr/local/etc/3proxy/bin/ || {
-        echo "Failed to copy 3proxy binary!"
+    # Find the compiled binary
+    BINARY_PATH=$(find_3proxy_binary)
+    if [ -z "$BINARY_PATH" ]; then
+        echo "ERROR: Could not find compiled 3proxy binary"
+        echo "Searched in:"
+        find . -name "3proxy" | tee -a /tmp/proxy_install.log
+        exit 1
+    fi
+    
+    echo "Found binary at: $BINARY_PATH"
+    
+    # Install to system location
+    mkdir -p /usr/local/etc/3proxy/bin
+    cp "$BINARY_PATH" /usr/local/etc/3proxy/bin/ || {
+        echo "ERROR: Failed to copy binary"
         exit 1
     }
     
-    if [ -f "./scripts/rc.d/proxy.sh" ]; then
-        cp ./scripts/rc.d/proxy.sh /etc/init.d/3proxy
-        chmod +x /etc/init.d/3proxy
-        chkconfig 3proxy on
-    else
-        echo "Warning: Could not find init script at ./scripts/rc.d/proxy.sh"
-        echo "Creating basic init script..."
-        cat > /etc/init.d/3proxy <<'EOL'
+    # Create init script
+    cat > /etc/init.d/3proxy <<'EOL'
 #!/bin/sh
-#
-# 3proxy daemon init script
-
 case "$1" in
     start)
         /usr/local/etc/3proxy/bin/3proxy /usr/local/etc/3proxy/3proxy.cfg
@@ -92,23 +77,17 @@ case "$1" in
     stop)
         pkill -9 3proxy
         ;;
-    restart)
-        pkill -9 3proxy
-        /usr/local/etc/3proxy/bin/3proxy /usr/local/etc/3proxy/3proxy.cfg
-        ;;
     *)
-        echo "Usage: $0 {start|stop|restart}"
+        echo "Usage: $0 {start|stop}"
         exit 1
-        ;;
 esac
 exit 0
 EOL
-        chmod +x /etc/init.d/3proxy
-        chkconfig 3proxy on
-    fi
     
+    chmod +x /etc/init.d/3proxy
+    chkconfig 3proxy on
     cd ..
-    echo "3proxy installed successfully"
+    echo "✓ 3Proxy installed successfully"
 }
 
 # [Rest of your existing functions remain the same...]
